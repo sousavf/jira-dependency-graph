@@ -29,7 +29,7 @@ class JiraSearch(object):
         self.url = url + '/rest/api/latest'
         self.auth = auth
         self.no_verify_ssl = no_verify_ssl
-        self.fields = ','.join(['key', 'summary', 'status', 'description', 'issuetype', 'issuelinks', 'subtasks', 'sprint'])
+        self.fields = ','.join(['key', 'summary', 'status', 'description', 'issuetype', 'issuelinks', 'subtasks', 'customfield_10020'])
 
     def get(self, uri, params={}):
         headers = {'Content-Type' : 'application/json'}
@@ -71,11 +71,11 @@ def is_issue_in_sprint(issue_fields, sprint_filter):
     if not sprint_filter:
         return True
     
-    if 'sprint' not in issue_fields or not issue_fields['sprint']:
+    if 'customfield_10020' not in issue_fields or not issue_fields['customfield_10020']:
         return False
     
     # Sprint field can be a list or a single object
-    sprints = issue_fields['sprint'] if isinstance(issue_fields['sprint'], list) else [issue_fields['sprint']]
+    sprints = issue_fields['customfield_10020'] if isinstance(issue_fields['customfield_10020'], list) else [issue_fields['customfield_10020']]
     
     for sprint in sprints:
         if sprint is None:
