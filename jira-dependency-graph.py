@@ -107,6 +107,7 @@ def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, 
     def create_node_text(issue_key, fields, islink=True):
         summary = fields['summary']
         status = fields['status']
+        issue_type = fields['issuetype']['name']
 
         if word_wrap == True:
             if len(summary) > MAX_SUMMARY_LENGTH:
@@ -121,8 +122,8 @@ def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, 
         # log('node ' + issue_key + ' status = ' + str(status))
 
         if islink:
-            return '"{}\\n({})"'.format(issue_key, summary)
-        return '"{}\\n({})" [href="{}", fillcolor="{}", style=filled]'.format(issue_key, summary, jira.get_issue_uri(issue_key), get_status_color(status))
+            return '"[{}] {}\\n({})"'.format(issue_type, issue_key, summary)
+        return '"[{}] {}\\n({})" [href="{}", fillcolor="{}", style=filled]'.format(issue_type, issue_key, summary, jira.get_issue_uri(issue_key), get_status_color(status))
 
     def process_link(fields, issue_key, link):
         if 'outwardIssue' in link:
