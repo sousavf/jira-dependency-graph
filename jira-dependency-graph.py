@@ -29,7 +29,7 @@ class JiraSearch(object):
         self.url = url + '/rest/api/latest'
         self.auth = auth
         self.no_verify_ssl = no_verify_ssl
-        self.fields = ','.join(['key', 'summary', 'status', 'description', 'issuetype', 'issuelinks', 'subtasks'])
+        self.fields = ','.join(['key', 'summary', 'status', 'description', 'issuetype', 'issuelinks', 'subtasks', 'sprint'])
 
     def get(self, uri, params={}):
         headers = {'Content-Type' : 'application/json'}
@@ -66,8 +66,30 @@ class JiraSearch(object):
         return self.__base_url + '/browse/' + issue_key
 
 
+def is_issue_in_sprint(issue_fields, sprint_filter):
+    """ Check if an issue belongs to the specified sprint """
+    if not sprint_filter:
+        return True
+    
+    if 'sprint' not in issue_fields or not issue_fields['sprint']:
+        return False
+    
+    # Sprint field can be a list or a single object
+    sprints = issue_fields['sprint'] if isinstance(issue_fields['sprint'], list) else [issue_fields['sprint']]
+    
+    for sprint in sprints:
+        if sprint is None:
+            continue
+        # Check both sprint name and ID
+        if (str(sprint.get('name', '')).lower() == sprint_filter.lower() or 
+            str(sprint.get('id', '')) == sprint_filter):
+            return True
+    
+    return False
+
+
 def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, directions, includes, issue_excludes,
-                     ignore_closed, ignore_epic, ignore_subtasks, traverse, word_wrap):
+                     ignore_closed, ignore_epic, ignore_subtasks, traverse, word_wrap, sprint_filter=None):
     """ Given a starting image key and the issue-fetching function build up the GraphViz data representing relationships
         between issues. This will consider both subtasks and issue links.
     """
@@ -117,6 +139,10 @@ def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, 
         linked_issue_key = get_key(linked_issue)
         if linked_issue_key in issue_excludes:
             log('Skipping ' + linked_issue_key + ' - explicitly excluded')
+            return
+
+        if not is_issue_in_sprint(linked_issue['fields'], sprint_filter):
+            log('Skipping ' + linked_issue_key + ' - not in specified sprint')
             return
 
         link_type = link['type'][direction]
@@ -172,6 +198,10 @@ def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, 
             log('Skipping ' + issue_key + ' - not traversing to a different project')
             return graph
 
+        if not is_issue_in_sprint(fields, sprint_filter):
+            log('Skipping ' + issue_key + ' - not in specified sprint')
+            return graph
+
         graph.append(create_node_text(issue_key, fields, islink=False))
 
         if not ignore_subtasks:
@@ -179,6 +209,9 @@ def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, 
                 issues = jira.query('"Epic Link" = "%s"' % issue_key)
                 for subtask in issues:
                     subtask_key = get_key(subtask)
+                    if not is_issue_in_sprint(subtask['fields'], sprint_filter):
+                        log('Skipping ' + subtask_key + ' - not in specified sprint')
+                        continue
                     log(subtask_key + ' => references epic => ' + issue_key)
                     node = '{}->{}[color=orange]'.format(
                         create_node_text(issue_key, fields),
@@ -188,6 +221,9 @@ def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, 
             if 'subtasks' in fields and not ignore_subtasks:
                 for subtask in fields['subtasks']:
                     subtask_key = get_key(subtask)
+                    if not is_issue_in_sprint(subtask['fields'], sprint_filter):
+                        log('Skipping ' + subtask_key + ' - not in specified sprint')
+                        continue
                     log(issue_key + ' => has subtask => ' + subtask_key)
                     node = '{}->{}[color=blue][label="subtask"]'.format (
                             create_node_text(issue_key, fields),
@@ -259,6 +295,7 @@ def parse_args():
     parser.add_argument('-T', '--dont-traverse', dest='traverse', action='store_false', default=True, help='Do not traverse to other projects')
     parser.add_argument('-w', '--word-wrap', dest='word_wrap', default=False, action='store_true', help='Word wrap issue summaries instead of truncating them')
     parser.add_argument('--no-verify-ssl', dest='no_verify_ssl', default=False, action='store_true', help='Don\'t verify SSL certs for requests')
+    parser.add_argument('--sprint', dest='sprint_filter', default=None, help='Only include issues from a specific sprint (sprint name or ID)')
     parser.add_argument('issues', nargs='*', help='The issue key (e.g. JRADEV-1107, JRADEV-1391)')
     return parser.parse_args()
 
@@ -300,7 +337,7 @@ def main():
     for issue in options.issues:
         graph = graph + build_graph_data(issue, jira, options.excludes, options.ignores, options.show_directions, options.directions,
                                          options.includes, options.issue_excludes, options.closed, options.ignore_epic,
-                                         options.ignore_subtasks, options.traverse, options.word_wrap)
+                                         options.ignore_subtasks, options.traverse, options.word_wrap, options.sprint_filter)
 
     if options.local:
         print_graph(filter_duplicates(graph), options.node_shape)
