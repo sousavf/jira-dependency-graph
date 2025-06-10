@@ -141,9 +141,7 @@ def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, 
             log('Skipping ' + linked_issue_key + ' - explicitly excluded')
             return
 
-        if not is_issue_in_sprint(linked_issue['fields'], sprint_filter):
-            log('Skipping ' + linked_issue_key + ' - not in specified sprint')
-            return
+# Allow cross-sprint relationships - don't filter linked issues by sprint
 
         link_type = link['type'][direction]
 
@@ -209,9 +207,7 @@ def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, 
                 issues = jira.query('"Epic Link" = "%s"' % issue_key)
                 for subtask in issues:
                     subtask_key = get_key(subtask)
-                    if not is_issue_in_sprint(subtask['fields'], sprint_filter):
-                        log('Skipping ' + subtask_key + ' - not in specified sprint')
-                        continue
+# Allow epic children from any sprint
                     log(subtask_key + ' => references epic => ' + issue_key)
                     node = '{}->{}[color=orange]'.format(
                         create_node_text(issue_key, fields),
@@ -221,9 +217,7 @@ def build_graph_data(start_issue_key, jira, excludes, ignores, show_directions, 
             if 'subtasks' in fields and not ignore_subtasks:
                 for subtask in fields['subtasks']:
                     subtask_key = get_key(subtask)
-                    if not is_issue_in_sprint(subtask['fields'], sprint_filter):
-                        log('Skipping ' + subtask_key + ' - not in specified sprint')
-                        continue
+# Allow subtasks from any sprint
                     log(issue_key + ' => has subtask => ' + subtask_key)
                     node = '{}->{}[color=blue][label="subtask"]'.format (
                             create_node_text(issue_key, fields),
